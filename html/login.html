@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>로그인</title>
+  <style>
+    :root {
+      --bg:#f7f7f8; --card:#fff; --text:#111; --muted:#666; --line:#e6e6e6;
+      --accent:#111; --ok:#0a7f42; --err:#d33; --input-h:44px;
+    }
+    * { box-sizing:border-box }
+    body { margin:0; background:var(--bg); color:var(--text);
+           font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,'Noto Sans KR',sans-serif }
+
+    /* ⬇️ 회원가입 페이지와 동일한 헤더 */
+    header { padding:16px; border-bottom:1px solid var(--line); background:#fff; }
+    .brand { font-weight:800; font-size:22px; text-decoration:none; color:var(--text); }
+
+    .page { max-width:520px; margin:32px auto; padding:0 16px }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:18px; padding:28px; box-shadow:0 1px 10px rgba(0,0,0,.04) }
+    .head { text-align:center; margin:6px 0 18px }
+    .avatar { width:98px; height:98px; border-radius:50%; margin:0 auto 10px; display:grid; place-items:center; background:#eee; color:#444; font-size:52px }
+    .title { font-size:22px; font-weight:700 }
+
+    label { display:block; font-size:13px; color:var(--muted); margin:14px 2px 6px }
+    .row { margin-bottom:2px }
+
+    .input { width:100%; height:var(--input-h); padding:0 14px; border:1px solid var(--line); border-radius:12px; background:#fff; outline:none }
+    .input:focus { border-color:#bbb; box-shadow:0 0 0 3px rgba(0,0,0,.06) }
+
+    .pw-field { position:relative }
+    .pw-field .input { padding-right:48px }
+
+    .eye-btn{
+      position:absolute; right:8px; top:50%; transform:translateY(-50%);
+      width:36px; height:36px; border:0; background:transparent; cursor:pointer;
+      background-repeat:no-repeat; background-position:center; background-size:22px;
+      background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239aa0a6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z'/><circle cx='12' cy='12' r='3' fill='%239aa0a6'/></svg>");
+    }
+    .eye-btn[data-show="true"]{
+      background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236b47d6' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z'/><circle cx='12' cy='12' r='3' fill='%236b47d6'/><circle cx='12' cy='11' r='1' fill='%23ffffff'/></svg>");
+    }
+
+    .actions { margin-top:18px }
+    .btn { width:100%; padding:13px 16px; border:0; border-radius:12px; background:var(--accent); color:#fff; font-weight:600; cursor:pointer }
+    .btn[disabled] { opacity:.6; cursor:default }
+
+    .hint { display:flex; justify-content:space-between; align-items:center; margin-top:8px; color:var(--muted); font-size:12px }
+    .err { font-size:13px; color:var(--err); margin-top:8px; display:none }
+    .msg { margin-top:12px; font-size:14px }
+    .msg.ok { color:var(--ok) }
+    .msg.bad { color:var(--err) }
+  </style>
+</head>
+<body>
+  <!-- 헤더 (회원가입 페이지와 동일) -->
+  <header>
+    <a class="brand" href="main.html">Kolon</a>
+  </header>
+
+  <div class="page">
+    <div class="card">
+      <div class="head">
+        <div class="avatar">👤</div>
+        <div class="title">로그인</div>
+      </div>
+
+      <!-- 자동완성 방지 -->
+      <form id="form" novalidate autocomplete="off">
+        <div class="row">
+          <label for="id">아이디(이메일)</label>
+          <!-- 기본값 없음 + 자동완성 최소화 -->
+          <input id="id" name="id" class="input" type="email"
+                 placeholder="이메일을 입력하세요"
+                 autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" required />
+        </div>
+
+        <div class="row">
+          <label for="pw">비밀번호</label>
+          <div class="pw-field">
+            <input id="pw" name="password" class="input" type="password"
+                   placeholder="비밀번호를 입력하세요"
+                   autocomplete="new-password" required />
+            <button type="button" class="eye-btn" id="eye" aria-label="비밀번호 표시" title="비밀번호 표시"></button>
+          </div>
+        </div>
+
+        <div class="hint">
+          <label><input type="checkbox" id="remember" /> 로그인 상태 유지</label>
+          <a href="#" onclick="alert('데모: 비밀번호 찾기');return false;">비밀번호 찾기</a>
+        </div>
+
+        <div id="err" class="err"></div>
+
+        <div class="actions">
+          <button class="btn" id="submitBtn" type="submit">로그인</button>
+          <div id="msg" class="msg"></div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // 서버 연동 시 API_BASE를 설정하면 실제 로그인 호출을 사용합니다.
+    const API_BASE = ""; // 비어있으면 로컬(Mock) 인증 사용
+
+    const USERS_KEY='users';
+    const $ = s => document.querySelector(s);
+    const form = $('#form'), err = $('#err'), msg = $('#msg'), btn = $('#submitBtn');
+    const eyeBtn = $('#eye'), pw = $('#pw'), idInput = $('#id');
+
+    function showError(t=""){ err.textContent=t; err.style.display=t?"block":"none" }
+
+    // 비밀번호 보이기/숨기기
+    eyeBtn.addEventListener('click', ()=>{
+      const show = pw.type === 'password';
+      pw.type = show ? 'text' : 'password';
+      eyeBtn.dataset.show = show ? "true" : "false";
+      eyeBtn.setAttribute('aria-label', show ? '비밀번호 숨기기' : '비밀번호 표시');
+      eyeBtn.title = eyeBtn.getAttribute('aria-label');
+    });
+
+    async function sha256(text){
+      const enc = new TextEncoder().encode(text);
+      const buf = await crypto.subtle.digest('SHA-256', enc);
+      return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+    }
+    const readUsers = ()=> { try{return JSON.parse(localStorage.getItem(USERS_KEY))||{}}catch{ return {} } };
+
+    form.addEventListener('submit', async (e)=>{
+      e.preventDefault(); showError(""); msg.className='msg'; msg.textContent="";
+      const id = idInput.value.trim();
+      const password = pw.value;
+      const remember = $('#remember').checked;
+
+      if(!id){ showError("이메일을 입력하세요."); return; }
+      if(!password){ showError("비밀번호를 입력하세요."); return; }
+
+      btn.disabled = true; msg.textContent = "확인 중...";
+
+      if(!API_BASE){
+        // === Mock: 회원가입 때 저장한 해시와 비교해서 로그인 ===
+        await new Promise(r=>setTimeout(r,250));
+        const users = readUsers();
+        const u = users[id];
+        if(!u){
+          msg.className='msg bad'; msg.textContent = "가입 이력이 없습니다. 회원가입 후 다시 시도해 주세요.";
+          btn.disabled=false; return;
+        }
+        const passHash = await sha256(password);
+        if (u.pass !== passHash){
+          msg.className='msg bad'; msg.textContent = "비밀번호가 일치하지 않습니다.";
+          btn.disabled=false; return;
+        }
+        if (remember) localStorage.setItem('authEmail', id);
+        msg.className='msg ok'; msg.textContent="로그인 성공 🎉 메인으로 이동합니다...";
+        setTimeout(()=>location.href='main.html', 600);
+        return;
+      }
+
+      // === 실제 API 모드 ===
+      try{
+        const res = await fetch(API_BASE+"/api/auth/login", {
+          method:"POST", headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({ id, password, remember }),
+          credentials:"include"
+        });
+        const data = await res.json().catch(()=>({}));
+        if(res.ok){
+          if (remember) localStorage.setItem('authEmail', id);
+          msg.className='msg ok'; msg.textContent="로그인 성공 🎉 메인으로 이동합니다...";
+          setTimeout(()=>location.href='main.html', 600);
+        }else{
+          msg.className='msg bad'; msg.textContent=data.msg||"로그인 실패";
+          btn.disabled=false;
+        }
+      }catch(e){
+        msg.className='msg bad'; msg.textContent="네트워크 오류: "+(e?.message||"요청 실패");
+        btn.disabled=false;
+      }
+    });
+  </script>
+</body>
+</html>
+

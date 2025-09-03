@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>회원가입</title>
+  <style>
+    :root { --bg:#f7f7f8; --card:#fff; --text:#111; --muted:#666; --line:#e6e6e6; --primary:#111; --error:#d33; --ok:#0a7f42; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--bg); font:16px/1.45 system-ui, -apple-system, Segoe UI, Roboto, 'Noto Sans KR', sans-serif; color:var(--text); }
+    header { padding:16px; border-bottom:1px solid var(--line); background:#fff; }
+    .brand { font-weight:800; font-size:22px; text-decoration:none; color:var(--text); }
+    .page { max-width:520px; margin:32px auto; padding:0 16px; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:18px; padding:28px; box-shadow:0 1px 10px rgba(0,0,0,.04); }
+    .head { text-align:center; margin-bottom:20px; }
+    .avatar { width:80px; height:80px; margin:0 auto 12px; border-radius:50%; display:grid; place-items:center; background:#eee; color:#888; font-size:42px; }
+    .title { font-size:22px; font-weight:700; }
+    label { display:block; font-size:13px; color:var(--muted); margin:14px 2px 6px; }
+    input { width:100%; padding:12px 14px; border:1px solid var(--line); border-radius:12px; outline:none; background:#fff; }
+    input:focus { border-color:#bbb; box-shadow:0 0 0 3px rgba(0,0,0,.06); }
+    .row { margin-bottom:4px; }
+    .hint { font-size:12px; color:var(--muted); margin-top:6px; }
+    .err { font-size:13px; color:var(--error); margin-top:6px; display:none; }
+    .btn { width:100%; margin-top:18px; padding:13px 16px; border:0; border-radius:12px; background:var(--primary); color:#fff; font-weight:600; cursor:pointer; }
+    .btn[disabled] { opacity:.6; cursor:default; }
+    .msg { margin-top:14px; font-size:14px; }
+    .msg.ok { color:var(--ok); }
+    .msg.bad { color:var(--error); white-space:pre-line; }
+    .tos { display:flex; gap:8px; align-items:center; font-size:13px; color:var(--muted); margin-top:8px; }
+  </style>
+</head>
+<body>
+  <header>
+    <a class="brand" href="main.html">Kolon</a>
+  </header>
+
+  <div class="page">
+    <div class="card">
+      <div class="head">
+        <div class="avatar">👤</div>
+        <div class="title">회원가입</div>
+      </div>
+
+      <form id="form" novalidate>
+        <div class="row">
+          <label for="email">아이디(이메일)</label>
+          <input id="email" name="email" type="email" autocomplete="email" required />
+          <div class="err" id="e_email"></div>
+        </div>
+
+        <div class="row">
+          <label for="pw">비밀번호</label>
+          <input id="pw" name="password" type="password" autocomplete="new-password" minlength="8" required />
+          <div class="hint">최소 8자, 영문/숫자 조합 권장</div>
+          <div class="err" id="e_pw"></div>
+        </div>
+
+        <div class="row">
+          <label for="pw2">비밀번호 확인</label>
+          <input id="pw2" name="password2" type="password" autocomplete="new-password" required />
+          <div class="err" id="e_pw2"></div>
+        </div>
+
+        <div class="row">
+          <label for="name">이름</label>
+          <input id="name" name="name" type="text" autocomplete="name" required />
+          <div class="err" id="e_name"></div>
+        </div>
+
+        <div class="row">
+          <label for="phone">휴대폰번호</label>
+          <input id="phone" name="phone" type="tel" placeholder="010-1234-5678" autocomplete="tel" required />
+          <div class="err" id="e_phone"></div>
+        </div>
+
+        <button class="btn" id="submitBtn" type="submit">동의하고 가입하기</button>
+        <div id="msg" class="msg"></div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = "";                 // 서버 붙이면 값 설정
+    const INITIAL_POINTS = 100000;       // 초기 포인트
+    const PROFILE_KEY = 'user_profile';  // {name, phone, address}
+    const POINT_KEY = 'points';
+    const USERS_KEY = 'users';           // { [email]: { pass: <sha256>, name, phone, address } }
+
+    const $ = s => document.querySelector(s);
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const phoneRe = /^01[016789]-?\d{3,4}-?\d{4}$/;
+
+    function showErr(id, msg){ const el=$('#e_'+id); if(el){ el.textContent=msg||''; el.style.display=msg?'block':'none'; } }
+    function validate(v){
+      let ok=true; showErr("email",""); showErr("pw",""); showErr("pw2",""); showErr("name",""); showErr("phone","");
+      if(!emailRe.test(v.email)){ showErr("email","이메일 형식이 올바르지 않습니다."); ok=false; }
+      if(!v.password || v.password.length<8){ showErr("pw","비밀번호는 8자 이상이어야 합니다."); ok=false; }
+      if(v.password!==v.password2){ showErr("pw2","비밀번호 확인이 일치하지 않습니다."); ok=false; }
+      if(!v.name.trim()){ showErr("name","이름을 입력하세요."); ok=false; }
+      if(!phoneRe.test(v.phone)){ showErr("phone","휴대폰 번호 형식이 올바르지 않습니다."); ok=false; }
+      if(!$('#agree').checked){ alert('약관에 동의해 주세요.'); ok=false; }
+      return ok;
+    }
+
+    async function sha256(text){
+      const enc = new TextEncoder().encode(text);
+      const buf = await crypto.subtle.digest('SHA-256', enc);
+      return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+    }
+    const readUsers = ()=> { try{return JSON.parse(localStorage.getItem(USERS_KEY))||{}}catch{ return {} } };
+    const writeUsers = (u)=> localStorage.setItem(USERS_KEY, JSON.stringify(u));
+
+    $('#form').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const btn=$('#submitBtn'), msg=$('#msg'); msg.className='msg'; msg.textContent="";
+      const v={
+        email:$('#email').value.trim(),
+        password:$('#pw').value,
+        password2:$('#pw2').value,
+        name:$('#name').value.trim(),
+        phone:$('#phone').value.trim(),
+        addr:$('#addr').value.trim()
+      };
+      if(!validate(v)) return;
+
+      btn.disabled=true; msg.textContent="전송 중...";
+
+      if(API_BASE){
+        try{
+          const res=await fetch(API_BASE+"/api/auth/register",{
+            method:"POST",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({email:v.email,password:v.password,name:v.name,phone:v.phone,address:v.addr}),
+            credentials:"include"
+          });
+          if(res.status===409){ msg.className='msg bad'; msg.textContent="이미 가입된 이메일입니다."; btn.disabled=false; return; }
+          if(!res.ok){ let data={}; try{data=await res.json()}catch{}; msg.className='msg bad'; msg.textContent=data.msg||`가입 실패 (HTTP ${res.status})`; btn.disabled=false; return; }
+
+          // 서버 모드: 포인트/비밀번호는 서버에서 처리
+          localStorage.setItem(PROFILE_KEY, JSON.stringify({name:v.name, phone:v.phone, address:v.addr}));
+          localStorage.setItem('lastSignedUpEmail', v.email);
+          msg.className='msg ok'; msg.textContent="가입 완료 🎉 로그인 페이지로 이동합니다...";
+          setTimeout(()=>location.href='login.html',700);
+          return;
+        }catch(err){
+          msg.className='msg bad'; msg.textContent="네트워크 오류: "+(err?.message||"요청 실패"); btn.disabled=false; return;
+        }
+      }
+
+      // === Mock 모드 ===
+      await new Promise(r=>setTimeout(r,300));
+
+      if(localStorage.getItem(POINT_KEY)===null){
+        localStorage.setItem(POINT_KEY, String(INITIAL_POINTS));
+      }
+
+      const users = readUsers();
+      users[v.email] = {
+        pass: await sha256(v.password),
+        name: v.name,
+        phone: v.phone,
+        address: v.addr
+      };
+      writeUsers(users);
+
+      localStorage.setItem(PROFILE_KEY, JSON.stringify({name:v.name, phone:v.phone, address:v.addr}));
+      localStorage.setItem('lastSignedUpEmail', v.email);
+
+      msg.className='msg ok'; msg.textContent="가입 완료 🎉 로그인 페이지로 이동합니다...";
+      setTimeout(()=>location.href='login.html',700);
+    });
+  </script>
+</body>
+</html>
+
+  <script>
+    // ===== 설정 =====
+    const API_BASE = "";                 // API 붙이면 값 세팅
+    const INITIAL_POINTS = 100000;       // ✅ 초기 포인트 (10,000 → 100,000)
+    const PROFILE_KEY = 'user_profile';  // {name, phone, address}
+    const POINT_KEY = 'points';
+
+    // ===== 유효성 =====
+    const $ = s => document.querySelector(s);
+    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const phoneRe = /^01[016789]-?\d{3,4}-?\d{4}$/;
+
+    function showErr(id, msg){ const el=$('#e_'+id); if(el){ el.textContent=msg||''; el.style.display=msg?'block':'none'; } }
+    function validate(v){
+      let ok=true; showErr("email",""); showErr("pw",""); showErr("pw2",""); showErr("name",""); showErr("phone","");
+      if(!emailRe.test(v.email)){ showErr("email","이메일 형식이 올바르지 않습니다."); ok=false; }
+      if(!v.password || v.password.length<8){ showErr("pw","비밀번호는 8자 이상이어야 합니다."); ok=false; }
+      if(v.password!==v.password2){ showErr("pw2","비밀번호 확인이 일치하지 않습니다."); ok=false; }
+      if(!v.name.trim()){ showErr("name","이름을 입력하세요."); ok=false; }
+      if(!phoneRe.test(v.phone)){ showErr("phone","휴대폰 번호 형식이 올바르지 않습니다."); ok=false; }
+      if(!$('#agree').checked){ alert('약관에 동의해 주세요.'); ok=false; }
+      return ok;
+    }
+
+    // ===== 제출 =====
+    $('#form').addEventListener('submit', async (e)=>{
+      e.preventDefault();
+      const btn=$('#submitBtn'), msg=$('#msg'); msg.className='msg'; msg.textContent="";
+
+      const v={
+        email:$('#email').value.trim(),
+        password:$('#pw').value,
+        password2:$('#pw2').value,
+        name:$('#name').value.trim(),
+        phone:$('#phone').value.trim(),
+        addr:$('#addr').value.trim()
+      };
+      if(!validate(v)) return;
+
+      btn.disabled=true; msg.textContent="전송 중...";
+
+      // 서버 연결 모드
+      if(API_BASE){
+        try{
+          const res=await fetch(API_BASE+"/api/auth/register",{
+            method:"POST",
+            headers:{"Content-Type":"application/json"},
+            body:JSON.stringify({email:v.email,password:v.password,name:v.name,phone:v.phone,address:v.addr}),
+            credentials:"include"
+          });
+
+          if(res.status===409){ msg.className='msg bad'; msg.textContent="이미 가입된 이메일입니다."; btn.disabled=false; return; }
+          if(!res.ok){
+            let data={}; try{ data=await res.json(); }catch{}
+            msg.className='msg bad'; msg.textContent=data.msg||`가입 실패 (HTTP ${res.status})`; btn.disabled=false; return;
+          }
+
+          // ⚠️ 실제 운영에선 서버가 100,000P를 '가입 트랜잭션'에서 1회 지급하세요.
+          // 프런트에선 중복 지급 방지를 위해 포인트를 세팅하지 않습니다.
+
+          // 결제에 사용할 프로필 저장(선택)
+          localStorage.setItem(PROFILE_KEY, JSON.stringify({name:v.name, phone:v.phone, address:v.addr}));
+
+          msg.className='msg ok'; msg.textContent="가입 완료 🎉 로그인 페이지로 이동합니다...";
+          setTimeout(()=>location.href='login.html',700);
+          return;
+
+        }catch(err){
+          msg.className='msg bad'; msg.textContent="네트워크 오류: "+(err?.message||"요청 실패"); btn.disabled=false; return;
+        }
+      }
+
+      // ===== Mock 모드 (API_BASE 비어있음) =====
+      await new Promise(r=>setTimeout(r,400));
+
+      // ✅ 초기 포인트 100,000P 1회 지급
+      if(localStorage.getItem(POINT_KEY)===null){
+        localStorage.setItem(POINT_KEY, String(INITIAL_POINTS));
+      }
+
+      // 결제용 프로필 저장
+      localStorage.setItem(PROFILE_KEY, JSON.stringify({name:v.name, phone:v.phone, address:v.addr}));
+
+      msg.className='msg ok';
+      msg.textContent="가입 완료 🎉 로그인 페이지로 이동합니다...";
+      setTimeout(()=>location.href='login.html',700);
+    });
+  </script>
+</body>
+</html>
+
